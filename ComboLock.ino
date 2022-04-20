@@ -60,6 +60,18 @@ void setup() {
 int cursor = 2;
 
 void loop() {
+  volatile unsigned long now = millis();
+  if (now - lastButtonPress > DEBOUNCE_TIME) {
+    lastButtonPress = now;
+    if (digitalRead(9) != 1) {
+      if (cursor == 0) {
+        cursor = 2;
+      } else {
+        cursor--;
+      }
+    }
+  }
+  
   if (cursor == 2) {
     cowpi_sendDataToMax7219(2, 0x00);
     cowpi_sendDataToMax7219(1, 0x00);
