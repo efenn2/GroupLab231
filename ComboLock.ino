@@ -9,6 +9,8 @@
 #include <EEPROM.h>
 #include "cowpi.h"
 
+#define DEBOUNCE_TIME 500u
+
 void setup() {
   Serial.begin(9600);
   cowpi_setup(SPI | MAX7219);
@@ -16,8 +18,20 @@ void setup() {
   cowpi_sendDataToMax7219(6, 0b1);
 }
 
+volatile unsigned long lastButtonPress = 0;
+int cursor = 2;
 void loop() {
-  int cursor = 2;
+  volatile unsigned long now = millis();
+  if (now - lastButtonPress > DEBOUNCE_TIME) {
+    lastButtonPress = now;
+  if (digitalRead(9) != 1) {
+    if (cursor == 0) {
+      cursor = 2;
+    } else {
+      cursor--;
+    }
+  }
+}
   if (cursor == 2) {
     cowpi_sendDataToMax7219(8, 0b10000000);
     cowpi_sendDataToMax7219(7, 0b10000000);
