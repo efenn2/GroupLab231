@@ -10,6 +10,7 @@
 #include "cowpi.h"
 
 #define DEBOUNCE_TIME 500u
+#Ihate this
 
 void setup() {
   Serial.begin(9600);
