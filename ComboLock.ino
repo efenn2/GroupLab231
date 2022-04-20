@@ -33,8 +33,6 @@ void loop() {
   }
 }
   if (cursor == 2) {
-    cowpi_sendDataToMax7219(5, 0b00000000);
-    cowpi_sendDataToMax7219(4, 0b00000000);
     cowpi_sendDataToMax7219(2, 0b00000000);
     cowpi_sendDataToMax7219(1, 0b00000000);
 
@@ -43,17 +41,13 @@ void loop() {
   } else if (cursor == 1) {
     cowpi_sendDataToMax7219(8, 0b00000000);
     cowpi_sendDataToMax7219(7, 0b00000000);
-    cowpi_sendDataToMax7219(2, 0b00000000);
-    cowpi_sendDataToMax7219(1, 0b00000000);
 
     cowpi_sendDataToMax7219(5, 0b10000000);
     cowpi_sendDataToMax7219(4, 0b10000000);
   } else {
     cowpi_sendDataToMax7219(5, 0b00000000);
     cowpi_sendDataToMax7219(4, 0b00000000);
-    cowpi_sendDataToMax7219(8, 0b00000000);
-    cowpi_sendDataToMax7219(7, 0b00000000);
-
+  
     cowpi_sendDataToMax7219(2, 0b10000000);
     cowpi_sendDataToMax7219(1, 0b10000000);
   }
