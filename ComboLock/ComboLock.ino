@@ -9,7 +9,7 @@
 #include <EEPROM.h>
 #include "cowpi.h"
 
-#define DEBOUNCE_TIME 20u
+#define DEBOUNCE_TIME 300u
 #define SINGLE_CLICK_TIME 150u
 #define DOUBLE_CLICK_TIME 500u
 #define NUMBER_OF_DIGITS 8
@@ -26,6 +26,17 @@ volatile unsigned long lastLeftSwitchSlide = 0;
 volatile unsigned long lastRightSwitchSlide = 0;
 volatile unsigned long lastKeypadPress = 0;
 volatile unsigned long lastButtonPress = 0;
+
+bool rightButtonIsPressed();
+
+unsigned long countdownStart = 0;
+const uint8_t *message = NULL;
+const uint8_t *lastMessage = NULL;
+
+const uint8_t leftCursor[8] = {0,0,0x1,0,0,0x1,0x80,0x80};
+const uint8_t middleCursor[8] = {0,0,0x1,0x80,0x80,0x1,0,0};
+const uint8_t rightCursor[8] = {0x80,0x80,0x1,0,0,0x1,0,0};
+const uint8_t clearMessage[8] = {0,0,0x1,0,0,0x1,0,0};
 
 // Seven Segment Display mapping between segments and bits
 // Bit7 Bit6 Bit5 Bit4 Bit3 Bit2 Bit1 Bit0
@@ -55,54 +66,49 @@ void setup() {
   cowpi_setup(SPI | MAX7219);
   cowpi_sendDataToMax7219(3, 0x1);
   cowpi_sendDataToMax7219(6, 0x1);
+  message = leftCursor;
 }
 
 int cursor = 2;
 
-void loop() {
+void loop() {  
   volatile unsigned long now = millis();
   if (now - lastButtonPress > DEBOUNCE_TIME) {
     lastButtonPress = now;
     if (digitalRead(9) != 1) {
-      if (cursor == 0) {
-        cursor = 2;
-      } else {
+      countdownStart = millis();
+      if (cursor == 2) {
         cursor--;
+        message = middleCursor;
+        lastMessage = clearMessage;
+        displayMessage(message);
+      } else if (cursor == 1) {
+        cursor--;
+        message = rightCursor;
+        lastMessage = clearMessage;
+        displayMessage(message);
+      } else if (cursor == 0) {
+        cursor = 2;
+        message = leftCursor;
+        lastMessage = clearMessage;
+        displayMessage(message);
       }
     }
-  }
-  
-  if (cursor == 2) {
-    cowpi_sendDataToMax7219(2, 0x00);
-    cowpi_sendDataToMax7219(1, 0x00);
-
-    cowpi_sendDataToMax7219(8, 0x80);
-    cowpi_sendDataToMax7219(7, 0x80);
-    delay(500);
-    cowpi_sendDataToMax7219(8, 0x00);
-    cowpi_sendDataToMax7219(7, 0x00);
-    delay(500);
-    handleKeypress();
-  } else if (cursor == 1) {
-    cowpi_sendDataToMax7219(8, 0x00);
-    cowpi_sendDataToMax7219(7, 0x00);
-
-    cowpi_sendDataToMax7219(5, 0x80);
-    cowpi_sendDataToMax7219(4, 0x80);
-    delay(500);
-    cowpi_sendDataToMax7219(5, 0x00);
-    cowpi_sendDataToMax7219(4, 0x00);
-    delay(500);
   } else {
-    cowpi_sendDataToMax7219(5, 0x00);
-    cowpi_sendDataToMax7219(4, 0x00);
-
-    cowpi_sendDataToMax7219(2, 0x80);
-    cowpi_sendDataToMax7219(1, 0x80);
-    delay(500);
-    cowpi_sendDataToMax7219(2, 0x00);
-    cowpi_sendDataToMax7219(1, 0x00);
-    delay(500);
+    now = millis();
+    if (now - countdownStart > 1000) {
+      countdownStart = now;
+      if (message == clearMessage) {
+        message = lastMessage;
+        lastMessage = clearMessage;
+      } else {
+        lastMessage = message;
+        message = clearMessage;
+      }
+      if (message != NULL) {
+        displayMessage(message);
+      }
+    }
   }
 }
 
@@ -155,5 +161,11 @@ void handleKeypress() {
     } else {
       Serial.println("Error reading keypad.");
     }
+  }
+}
+
+void displayMessage(const uint8_t message[8]) {
+  for (int i=8; i>0; i--) {
+    cowpi_sendDataToMax7219(i, message[i-1]);
   }
 }
