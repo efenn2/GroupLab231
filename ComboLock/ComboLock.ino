@@ -14,19 +14,6 @@
 #define DOUBLE_CLICK_TIME 500u
 #define NUMBER_OF_DIGITS 8
 
-/* Memory-mapped I/O */
-cowpi_ioPortRegisters *ioPorts;     // an array of I/O ports
-cowpi_spiRegisters *spi;            // a pointer to the single set of SPI registers
-cowpi_timerRegisters16bit *timer1;  // a pointer to one 16-bit timer
-cowpi_timerRegisters8bit *timer2;   // a pointer to one 8-bit timer
-
-volatile unsigned long lastLeftButtonAction = 0;
-volatile unsigned long lastRightButtonAction = 0;
-volatile unsigned long lastLeftSwitchSlide = 0;
-volatile unsigned long lastRightSwitchSlide = 0;
-volatile unsigned long lastKeypadPress = 0;
-volatile unsigned long lastButtonPress = 0;
-
 bool rightButtonIsPressed();
 
 unsigned long countdownStart = 0;
@@ -38,64 +25,17 @@ const uint8_t middleCursor[8] = {0,0,0x1,0x80,0x80,0x1,0,0};
 const uint8_t rightCursor[8] = {0x80,0x80,0x1,0,0,0x1,0,0};
 const uint8_t clearMessage[8] = {0,0,0x1,0,0,0x1,0,0};
 
-// Seven Segment Display mapping between segments and bits
-// Bit7 Bit6 Bit5 Bit4 Bit3 Bit2 Bit1 Bit0
-//  DP   A    B    C    D    E    F    G
-// This array holds the bit patterns to display each hexadecimal numeral
-const uint8_t sevenSegments[16] = {
-  0b1111110,  // 0
-  0b0110000,  // 1
-  0b1101101,  // 2
-  0b1111001,  // 3
-  0b0110011,  // 4
-  0b1011011,  // 5
-  0b1011111,  // 6
-  0b1110000,  // 7
-  0b1111111,  // 8
-  0b1111011,  // 9
-  0b1110111,  // A
-  0b0011111,  // b
-  0b0001101,  // c
-  0b0111101,  // d
-  0b1001111,  // E
-  0b1000111   // F
-};
+uint8_t display[8] = {0b00000000,0b00000000,0b00000001,0b00000000,0b00000000,0b00000001,0b00000000,0b00000000};
+uint8_t combo[8] = {0b00110000, 0b01101101, 0b00000001, 0b01111001, 0b00110011, 0b00000001, 0b01011011, 0b01011111};
+uint8_t errorMessage[8] = {0b00000000,0b00000000,0b00000000,0b01001111,0b00000101,0b00000101,0b00011101,0b00000101};
+uint8_t badTryMessage[8] = {0b00011111, 0b01110111, 0b00111101,0b00001111,0b00000101,0b00111011,0b00000000,0b00000000};
+uint8_t alertMessage[8] = {0b00000000,0b00000000, 0b01110111,0b00001110,0b01001111,0b00000101,0b00001111,0b10100000};
 
-uint8_t getKeypress() {
-  if (cowpi_getKeypress() == '1') {
-    return 0x01;
-  } else if (cowpi_getKeypress() == '2') {
-    return 0x02;
-  } else if (cowpi_getKeypress() == '3') {
-    return 0x03;
-  } else if (cowpi_getKeypress() == '4') {
-    return 0x04;
-  } else if (cowpi_getKeypress() == '5') {
-    return 0x05;
-  } else if (cowpi_getKeypress() == '6') {
-    return 0x06;
-  } else if (cowpi_getKeypress() == '7') {
-    return 0x07;
-  } else if (cowpi_getKeypress() == '8') {
-    return 0x08;
-  } else if (cowpi_getKeypress() == '9') {
-    return 0x09;
-  } else if (cowpi_getKeypress() == 'A') {
-    return 0x0A;
-  } else if (cowpi_getKeypress() == 'B') {
-    return 0x0B;
-  } else if (cowpi_getKeypress() == 'C') {
-    return 0x0C;
-  } else if (cowpi_getKeypress() == 'D') {
-    return 0x0D;
-  } else if (cowpi_getKeypress() == '#') {
-    return 0x0E;
-  } else if (cowpi_getKeypress() == '*') {
-    return 0x0F;
-  } else {
-    return 0x00;
-  }
-}
+bool equal = false;
+int attempt = 0;
+bool alarm = false;
+unsigned long lastKeypadPress = 0;
+unsigned long lastButtonPress = 0;
 
 void setup() {
   Serial.begin(9600);
@@ -106,10 +46,13 @@ void setup() {
 }
 
 int cursor = 2;
-
 void loop() {
   handleKeypress();
   responsiveMessageWithoutInterrupts();
+
+  if (digitalRead(8) == 0 ) {
+    leftButtonPress();
+  }
 }
 
 // 5 modes (LOCKED, UNLOCKED, ALARMED, CHANGING, CONFIRMING)
@@ -155,6 +98,42 @@ void responsiveMessageWithoutInterrupts() {
   }
 }
 
+uint8_t getKeypress() {
+  if (cowpi_getKeypress() == '1') {
+    return 0x01;
+  } else if (cowpi_getKeypress() == '2') {
+    return 0x02;
+  } else if (cowpi_getKeypress() == '3') {
+    return 0x03;
+  } else if (cowpi_getKeypress() == '4') {
+    return 0x04;
+  } else if (cowpi_getKeypress() == '5') {
+    return 0x05;
+  } else if (cowpi_getKeypress() == '6') {
+    return 0x06;
+  } else if (cowpi_getKeypress() == '7') {
+    return 0x07;
+  } else if (cowpi_getKeypress() == '8') {
+    return 0x08;
+  } else if (cowpi_getKeypress() == '9') {
+    return 0x09;
+  } else if (cowpi_getKeypress() == 'A') {
+    return 0x0A;
+  } else if (cowpi_getKeypress() == 'B') {
+    return 0x0B;
+  } else if (cowpi_getKeypress() == 'C') {
+    return 0x0C;
+  } else if (cowpi_getKeypress() == 'D') {
+    return 0x0D;
+  } else if (cowpi_getKeypress() == '#') {
+    return 0x0E;
+  } else if (cowpi_getKeypress() == '*') {
+    return 0x0F;
+  } else {
+    return 0x00;
+  }
+}
+
 void handleKeypress() {
   unsigned long now = millis();
   if (cowpi_getKeypress() && now - lastKeypadPress > DEBOUNCE_TIME) {
@@ -173,4 +152,65 @@ void displayMessage(const uint8_t message[8]) {
   for (int i=8; i>0; i--) {
     cowpi_sendDataToMax7219(i, message[i-1]);
   }
+}
+
+void leftButtonPress() {
+  // submits Combo
+  // if all numbers not entered, display error for one second
+  for (int i = 0; i < 8; i++) {
+    if (display[i] == 0) {
+      int displayNum = 8;
+      for (int count = 0; count < 8; count++) {
+        cowpi_sendDataToMax7219(displayNum, errorMessage[count]);
+        displayNum--;
+      }
+      delay(1000);
+      int count = 8;
+      for (int x = 0; x < 8; x++) {
+        cowpi_sendDataToMax7219(count, display[x]);
+        count--;
+      }
+      i =7;
+    } else if (display[i] == combo[i]) {
+        equal = true;
+    } else {
+      equal = false;
+      attempt++;
+      int displayNum = 8;
+      for (int count = 0; count < 8; count++) {
+        cowpi_sendDataToMax7219(displayNum, badTryMessage[count]);
+        displayNum--;
+      }
+      if (attempt == 1) {
+        cowpi_sendDataToMax7219(1, 0b00110000);
+      } else if (attempt == 2) {
+        cowpi_sendDataToMax7219(1, 0b01101101);
+      } else {
+        alarm = true;
+        cowpi_sendDataToMax7219(1, 0b01111001);
+        int displayNum = 8;
+        for (int count = 0; count < 8; count++) {
+          cowpi_sendDataToMax7219(displayNum, alertMessage[count]);
+          displayNum--;
+        }
+        while (alarm == true) {
+          digitalWrite(12, HIGH);
+          delay(250);
+          digitalWrite(12, LOW);
+          delay(250);
+        }
+      }
+      i = 7;
+    }
+  }
+    if (equal == true) {
+      cowpi_sendDataToMax7219(8, 0b00001110);
+      cowpi_sendDataToMax7219(7, 0b01110111);
+      cowpi_sendDataToMax7219(6, 0b00011111);
+      cowpi_sendDataToMax7219(5, 0b00000000);
+      cowpi_sendDataToMax7219(4, 0b00011101);
+      cowpi_sendDataToMax7219(3, 0b01100111);
+      cowpi_sendDataToMax7219(2, 0b01001111);
+      cowpi_sendDataToMax7219(2, 0b01110110);
+    }
 }
