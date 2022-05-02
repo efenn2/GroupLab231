@@ -34,10 +34,7 @@ const uint8_t *message = NULL;
 const uint8_t *lastMessage = NULL;
 
 const uint8_t leftCursor[8] = {0,0,0x1,0,0,0x1,0x80,0x80};
-const uint8_t middleCursor[8] = {0,0,0x1,0x80,0x80,0x1,0,0};
-const uint8_t rightCursor[8] = {0x80,0x80,0x1,0,0,0x1,0,0};
 uint8_t clearMessage[8] = {0,0,0x1,0,0,0x1,0,0};
-// uint8_t defaultMessage[8] = {0,0,0x1,0,0,0x1,0,0};
 
 // Seven Segment Display mapping between segments and bits
 // Bit7 Bit6 Bit5 Bit4 Bit3 Bit2 Bit1 Bit0
@@ -116,88 +113,71 @@ void loop() {
 
 int currentPosition = 7;
 uint8_t currentMessage[8] = {0,0,0x1,0,0,0x1,0x80,0x80};
+uint8_t defaultMessage[8] = {0,0,0x1,0,0,0x1,0,0};
 
 void responsiveMessageWithoutInterrupts(unsigned long now) {
-  // volatile unsigned long now = millis();
   if (now - lastButtonPress > DEBOUNCE_TIME) {
     lastButtonPress = now;
-    // if (digitalRead(9) != 1) {
-    //   countdownStart = millis();
-    //   if (currentPosition < 2) {
-    //     currentPosition = 7;
-    //     message = leftCursor;
-    //     lastMessage = clearMessage;
-    //   } else if (currentPosition < 5) {
-    //     currentPosition = 1;
-    //     message = rightCursor;
-    //     lastMessage = clearMessage;
-    //   } else {
-    //     currentPosition = 4;
-    //     currentMessage[7] &= 0x7f;
-    //     currentMessage[6] &= 0x7f;
-    //     lastMessage = currentMessage;
-    //     currentMessage[4] = middleCursor[4];
-    //     currentMessage[3] = middleCursor[3];
-    //     message = currentMessage;
-    //   }
-    // }
-    if (digitalRead(9) != 1) {
-      countdownStart = millis();
-      if (currentPosition < 2) {
-        currentPosition = 7;
-        message = leftCursor;
-        lastMessage = clearMessage;
-        displayMessage(message);
-      } else if (currentPosition < 5) {
-        currentPosition = 1;
-        message = rightCursor;
-        lastMessage = clearMessage;
-        displayMessage(message);
-      } else {
-        currentPosition = 4;
-        message = middleCursor;
-        lastMessage = clearMessage;
-        displayMessage(message);
-      }
-    }
+    handleRightButtonPress();
   } else {
     now = millis();
     if (now - countdownStart > 1000) {
       countdownStart = now;
-      // changes need to be made to this to correctly display the message
-      if (message == clearMessage) {
+      if (message == defaultMessage) {
         message = lastMessage;
-        lastMessage = clearMessage;
+        lastMessage = defaultMessage;
       } else {
         lastMessage = message;
-        message = clearMessage;
+        message = defaultMessage;
       }
       if (message != NULL) {
         displayMessage(message);
       }
     }
-    // if (now - countdownStart > 1000) {
-    //   countdownStart = now;
-    //   if (message == clearMessage) {
-    //     message = lastMessage;
-    //     lastMessage = clearMessage;
-    //   } else {
-    //     lastMessage = message;
-    //     message = clearMessage;
-    //   }
-    //   if (message != NULL) {
-    //     displayMessage(message);
-    //   }
-    // }
   }
 }
 
-uint8_t enterLeftMessage[8] = {0,0,0x1,0,0,0x1,0x80,0x80};
-uint8_t enterMiddleMessage[8] = {0,0,0x1,0x80,0x80,0x1,0,0};
-uint8_t enterRightMessage[8] = {0x80,0x80,0x1,0,0,0x1,0,0};
+void handleRightButtonPress() {
+  if (digitalRead(9) != 1) {
+    countdownStart = millis();
+    if (currentPosition < 2) {
+      currentPosition = 7;
+      currentMessage[1] &= 0x7f;
+      currentMessage[0] &= 0x7f;
+      copyArray(currentMessage, defaultMessage);
+      defaultMessage[7] = 0;
+      defaultMessage[6] = 0;
+      currentMessage[7] |= 0x80;
+      currentMessage[6] |= 0x80;
+      lastMessage = currentMessage;
+      message = defaultMessage;
+    } else if (currentPosition < 5) {
+      currentPosition = 1;
+      currentMessage[4] &= 0x7f;
+      currentMessage[3] &= 0x7f;
+      copyArray(currentMessage, defaultMessage);
+      defaultMessage[1] = 0;
+      defaultMessage[0] = 0;
+      currentMessage[1] |= 0x80;
+      currentMessage[0] |= 0x80;
+      lastMessage = currentMessage;
+      message = defaultMessage;
+    } else {
+      currentPosition = 4;
+      currentMessage[7] &= 0x7f;
+      currentMessage[6] &= 0x7f;
+      copyArray(currentMessage, defaultMessage);
+      defaultMessage[4] = 0;
+      defaultMessage[3] = 0;
+      currentMessage[4] |= 0x80;
+      currentMessage[3] |= 0x80;
+      lastMessage = currentMessage;
+      message = defaultMessage;
+    }
+  }
+}
 
 void handleKeypress(unsigned long now) {
-  // unsigned long now = millis();
   if (cowpi_getKeypress() && now - lastKeypadPress > DEBOUNCE_TIME) {
     countdownStart = millis();
     lastKeypadPress = now;
@@ -222,13 +202,12 @@ void handleKeypress(unsigned long now) {
       currentPosition++;
     }
     message = currentMessage;
-    if (keypress < 0x10) {
-      Serial.print("Key pressed: ");
-      Serial.println(keypress, HEX);
-    } else {
-      Serial.println("Error reading keypad.");
-      Serial.println(currentPosition);
-    }
+  }
+}
+
+void copyArray(uint8_t source[8], uint8_t destination[8]) {
+  for(int i=0; i<8; i++) {
+    destination[i] |= source[i];
   }
 }
 
