@@ -248,9 +248,16 @@ void displayMessage(const uint8_t message[8]) {
   }
 }
 
+bool error = false;
 void leftButtonPress() {
   for (int i = 0, j = 8; i < 8 && j > 0; i++, j--) {
-    if ((currentMessage[j-1] & 0x7F) == 0) {
+    for (int count = 0; count < 8; count++) {
+      if ((currentMessage[count] & 0x7F) == 0) {
+          error = true;
+      }
+    }
+
+    if (error == true){
       int displayNum = 8;
       for (int count = 0; count < 8; count++) {
         cowpi_sendDataToMax7219(displayNum, errorMessage[count]);
@@ -262,6 +269,7 @@ void leftButtonPress() {
         cowpi_sendDataToMax7219(count, (currentMessage[x] & 0x7F));
         count--;
       }
+      equal = false;
       i = 7;
     } else if ((currentMessage[j-1] & 0x7F) == combo[i]) {
       equal = true;
@@ -287,6 +295,7 @@ void leftButtonPress() {
       i = 7;
     }
   }
+  error = false;
   if (equal == true) {
     int displayNum = 8;
     for (int count = 0; count < 8; count++) {
@@ -380,8 +389,8 @@ void confirmingMode() {
       for (int count = 0; count < 8; count++) {
         combo[count] = (currentMessage[count] & 0x7F);
       }
-      mode = 2;
     }
+    mode = 2;
   }
 }
 
@@ -396,5 +405,6 @@ void lockedMode() {
   for (int x = 0; x < 8; x++) {
     cowpi_sendDataToMax7219(i, clearMessage[x]);
     i--;
+  }
   mode = 1;
 }
