@@ -22,11 +22,10 @@ const uint8_t *message = NULL;
 const uint8_t *lastMessage = NULL;
 
 const uint8_t leftCursor[8] = {0, 0, 0x1, 0, 0, 0x1, 0x80, 0x80};
-const uint8_t middleCursor[8] = {0, 0, 0x1, 0x80, 0x80, 0x1, 0, 0};
-const uint8_t rightCursor[8] = {0x80, 0x80, 0x1, 0, 0, 0x1, 0, 0};
 const uint8_t clearMessage[8] = {0, 0, 0x1, 0, 0, 0x1, 0, 0};
+uint8_t currentMessage[8] = {0,0,0x1,0,0,0x1,0x80,0x80};
+uint8_t defaultMessage[8] = {0,0,0x1,0,0,0x1,0,0};
 
-uint8_t display[8] = {0, 0, 0x1, 0, 0, 0x1, 0, 0};
 uint8_t combo[8] = {0x30, 0x6D, 0x1, 0x79, 0x33, 0x1, 0x5B, 0x5F};
 uint8_t errorMessage[8] = {0, 0, 0, 0x4F, 0x5, 0x5, 0x1D, 0x5};
 uint8_t badTryMessage[8] = {0x1F, 0x77, 0x3D, 0xF, 0x5, 0x3B, 0, 0};
@@ -45,6 +44,7 @@ bool alarm = false;
 unsigned long lastKeypadPress = 0;
 unsigned long lastButtonPress = 0;
 int mode = 1;
+int currentPosition = 7;
 uint8_t leftSwitch = ioPorts[A0_A5].input & (1 << 4);
 uint8_t rightSwitch = ioPorts[A0_A5].input & (1 << 5);
 
@@ -108,6 +108,7 @@ uint8_t getKeypress() {
 }
 
 uint8_t storedCombo[8];
+
 void setup() {
   Serial.begin(9600);
   EEPROM.get(4, storedCombo);
@@ -120,7 +121,6 @@ void setup() {
   message = leftCursor;
 }
 
-int cursor = 2;
 void loop() {
   leftSwitch = ioPorts[A0_A5].input & (1 << 4);
   rightSwitch = ioPorts[A0_A5].input & (1 << 5);
@@ -143,12 +143,6 @@ void loop() {
   }
 
 }
-
-// 5 modes (LOCKED, UNLOCKED, ALARMED, CHANGING, CONFIRMING)
-
-int currentPosition = 7;
-uint8_t currentMessage[8] = {0,0,0x1,0,0,0x1,0x80,0x80};
-uint8_t defaultMessage[8] = {0,0,0x1,0,0,0x1,0,0};
 
 void responsiveMessageWithoutInterrupts(unsigned long now) {
   if (now - lastButtonPress > DEBOUNCE_TIME) {
@@ -246,6 +240,12 @@ void copyArray(uint8_t source[8], uint8_t destination[8]) {
   }
 }
 
+void replaceArray(uint8_t source[8], uint8_t destination[8]) {
+  for(int i=0; i<8; i++) {
+    destination[i] = source[i];
+  }
+}
+
 void displayMessage(const uint8_t message[8]) {
   for (int i = 8; i > 0; i--) {
     cowpi_sendDataToMax7219(i, message[i - 1]);
@@ -254,6 +254,7 @@ void displayMessage(const uint8_t message[8]) {
 
 bool error = false;
 int temp = 0;
+
 void leftButtonPress() {
   for (int i = 0, j = 8; i < 8 && j > 0; i++, j--) {
     for (int count = 0; count < 8; count++) {
@@ -263,7 +264,6 @@ void leftButtonPress() {
     }
 
     for (int x = 0; x < 8; x++) {
-      Serial.println(currentMessage[x]);
       temp += currentMessage[x];
     }
 
@@ -297,7 +297,7 @@ void leftButtonPress() {
       }
       equal = false;
       i = 7;
-    } else if ((currentMessage[j-1] & 0x7F) == storedCombo[i]) {
+    } else if ((currentMessage[j-1] & 0x7F) == (storedCombo[j-1] & 0x7F)) {
       equal = true;
     } else {
       equal = false;
@@ -321,7 +321,6 @@ void leftButtonPress() {
       i = 7;
     }
   }
-  error = false;
   if (equal == true) {
     int displayNum = 8;
     for (int count = 0; count < 8; count++) {
@@ -365,13 +364,10 @@ void unlockMode() {
 }
 
 void changingMode() {
-  int count = 8;
-  for (int x = 0; x < 8; x++) {
-    cowpi_sendDataToMax7219(count, clearMessage[x]);
-    count--;
-  }
-  //read numbers being pressed and put into display array
+  message = leftCursor;
+  lastMessage = clearMessage;
   if ((leftSwitch == 0) && (digitalRead(8) == 0)) {
+    replaceArray(currentMessage, confirmed);
     mode = 4;
     int displayNum = 8;
     for (int count = 0; count < 8; count++) {
@@ -383,17 +379,12 @@ void changingMode() {
 }
 
 void confirmingMode() {
-  int count = 8;
-  for (int x = 0; x < 8; x++) {
-    cowpi_sendDataToMax7219(count, clearMessage[x]);
-    count--;
-  }
-
-  //read numbers being pressed and put into a new array
+  message = leftCursor;
+  lastMessage = clearMessage;
   if ((rightSwitch == 0) && (digitalRead(8) == 0)) {
     equal = false;
     for (int x = 0; x < 8; x++) {
-      if (confirmed[x] == (currentMessage[x] & 0x7F)) {
+      if ((confirmed[x] & 0x7F) == (currentMessage[x] & 0x7F)) {
         equal = true;
       } else {
         equal = false;
@@ -415,8 +406,10 @@ void confirmingMode() {
       for (int count = 0; count < 8; count++) {
         combo[count] = (currentMessage[count] & 0x7F);
       }
-      EEPROM.put(4, combo);
+      EEPROM.put(4,combo);
+      delay(1000);
     }
+    message = currentMessage;
     mode = 2;
   }
 }
