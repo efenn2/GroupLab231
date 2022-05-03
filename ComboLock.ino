@@ -257,6 +257,12 @@ void copyArray(uint8_t source[8], uint8_t destination[8]) {
   }
 }
 
+void replaceArray(uint8_t source[8], uint8_t destination[8]) {
+  for(int i=0; i<8; i++) {
+    destination[i] = source[i];
+  }
+}
+
 void displayMessage(const uint8_t message[8]) {
   for (int i = 8; i > 0; i--) {
     cowpi_sendDataToMax7219(i, message[i - 1]);
@@ -345,26 +351,20 @@ void unlockMode() {
 }
 
 void changingMode() {
-  // int count = 8;
-  // for (int x = 0; x < 8; x++) {
-  //   cowpi_sendDataToMax7219(count, clearMessage[x]);
-  //   count--;
-  // }
   // only blinks if message != defaultMessage != lastMessage
-  currentPosition = 7;
-  // message = leftCursor;
+  // currentPosition = 7;
+  message = leftCursor;
   lastMessage = clearMessage;
-  // copyArray(leftCursor, currentMessage);
-  // copyArray(clearMessage, defaultMessage);
-  copyArray(leftCursor, defaultMessage);
-  defaultMessage[3] = 0;
-  defaultMessage[4] = 0;
-  defaultMessage[6] = 0x80;
-  defaultMessage[7] = 0x80;
-  message = defaultMessage;
+  // replaceArray(clearMessage, defaultMessage);
+  // replaceArray(leftCursor, currentMessage);
+  // lastMessage = currentMessage;
+  // message = defaultMessage;
+  // lastMessage = message;
+  // message = defaultMessage;
   
   //read numbers being pressed and put into display array
   if ((leftSwitch == 0) && (digitalRead(8) == 0)) {
+    replaceArray(currentMessage, confirmed);
     mode = 4;
     int displayNum = 8;
     for (int count = 0; count < 8; count++) {
@@ -376,16 +376,13 @@ void changingMode() {
 }
 
 void confirmingMode() {
-  int count = 8;
-  for (int x = 0; x < 8; x++) {
-    cowpi_sendDataToMax7219(count, clearMessage[x]);
-    count--;
-  }
+  message = leftCursor;
+  lastMessage = clearMessage;
   //read numbers being pressed and put into a new array
   if ((rightSwitch == 0) && (digitalRead(8) == 0)) {
     equal = false;
     for (int x = 0; x < 8; x++) {
-      if (confirmed[x] == (currentMessage[x] & 0x7F)) {
+      if ((confirmed[x] & 0x7F) == (currentMessage[x] & 0x7F)) {
         equal = true;
       } else {
         equal = false;
