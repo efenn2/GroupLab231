@@ -22,9 +22,9 @@ const uint8_t *message = NULL;
 const uint8_t *lastMessage = NULL;
 
 const uint8_t leftCursor[8] = {0, 0, 0x1, 0, 0, 0x1, 0x80, 0x80};
-const uint8_t middleCursor[8] = {0, 0, 0x1, 0x80, 0x80, 0x1, 0, 0};
-const uint8_t rightCursor[8] = {0x80, 0x80, 0x1, 0, 0, 0x1, 0, 0};
 const uint8_t clearMessage[8] = {0, 0, 0x1, 0, 0, 0x1, 0, 0};
+uint8_t currentMessage[8] = {0,0,0x1,0,0,0x1,0x80,0x80};
+uint8_t defaultMessage[8] = {0,0,0x1,0,0,0x1,0,0};
 
 uint8_t display[8] = {0, 0, 0x1, 0, 0, 0x1, 0, 0};
 uint8_t combo[8] = {0x30, 0x6D, 0x1, 0x79, 0x33, 0x1, 0x5B, 0x5F};
@@ -45,6 +45,7 @@ bool alarm = false;
 unsigned long lastKeypadPress = 0;
 unsigned long lastButtonPress = 0;
 int mode = 1;
+int currentPosition = 7;
 uint8_t leftSwitch = ioPorts[A0_A5].input & (1 << 4);
 uint8_t rightSwitch = ioPorts[A0_A5].input & (1 << 5);
 
@@ -116,7 +117,6 @@ void setup() {
   message = leftCursor;
 }
 
-int cursor = 2;
 void loop() {
   leftSwitch = ioPorts[A0_A5].input & (1 << 4);
   rightSwitch = ioPorts[A0_A5].input & (1 << 5);
@@ -140,10 +140,6 @@ void loop() {
 
 }
 
-int currentPosition = 7;
-uint8_t currentMessage[8] = {0,0,0x1,0,0,0x1,0x80,0x80};
-uint8_t defaultMessage[8] = {0,0,0x1,0,0,0x1,0,0};
-
 void responsiveMessageWithoutInterrupts(unsigned long now) {
   if (now - lastButtonPress > DEBOUNCE_TIME) {
     lastButtonPress = now;
@@ -152,27 +148,10 @@ void responsiveMessageWithoutInterrupts(unsigned long now) {
     now = millis();
     if (now - countdownStart > 1000) {
       countdownStart = now;
-      for(int i=0; i<8; i++) {
-        Serial.print(message[i]);
-        Serial.print(", ");
-      }
-      Serial.println("message");
-      for(int i=0; i<8; i++) {
-        Serial.print(defaultMessage[i]);
-        Serial.print(", ");
-      }
-      Serial.println("defaultMessage");
-      for(int i=0; i<8; i++) {
-        Serial.print(lastMessage[i]);
-        Serial.print(", ");
-      }
-      Serial.println("lastMessage");
       if (message == defaultMessage) {
-        Serial.println("Message update 1");
         message = lastMessage;
         lastMessage = defaultMessage;
       } else {
-        Serial.println("Message update 2");
         lastMessage = message;
         message = defaultMessage;
       }
@@ -351,18 +330,8 @@ void unlockMode() {
 }
 
 void changingMode() {
-  // only blinks if message != defaultMessage != lastMessage
-  // currentPosition = 7;
   message = leftCursor;
   lastMessage = clearMessage;
-  // replaceArray(clearMessage, defaultMessage);
-  // replaceArray(leftCursor, currentMessage);
-  // lastMessage = currentMessage;
-  // message = defaultMessage;
-  // lastMessage = message;
-  // message = defaultMessage;
-  
-  //read numbers being pressed and put into display array
   if ((leftSwitch == 0) && (digitalRead(8) == 0)) {
     replaceArray(currentMessage, confirmed);
     mode = 4;
@@ -378,7 +347,6 @@ void changingMode() {
 void confirmingMode() {
   message = leftCursor;
   lastMessage = clearMessage;
-  //read numbers being pressed and put into a new array
   if ((rightSwitch == 0) && (digitalRead(8) == 0)) {
     equal = false;
     for (int x = 0; x < 8; x++) {
@@ -404,8 +372,10 @@ void confirmingMode() {
       for (int count = 0; count < 8; count++) {
         combo[count] = (currentMessage[count] & 0x7F);
       }
-      mode = 2;
+      delay(1000);
     }
+    message = currentMessage;
+    mode = 2;
   }
 }
 
