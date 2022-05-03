@@ -107,8 +107,12 @@ uint8_t getKeypress() {
   }
 }
 
+uint8_t storedCombo[8];
 void setup() {
   Serial.begin(9600);
+  EEPROM.get(4, storedCombo);
+  storedCombo[2] = 0x1;
+  storedCombo[5] = 0x1;
   cowpi_setup(SPI | MAX7219);
   ioPorts = (cowpi_ioPortRegisters *) (cowpi_IObase + 3);
   cowpi_sendDataToMax7219(3, 0x1);
@@ -249,12 +253,34 @@ void displayMessage(const uint8_t message[8]) {
 }
 
 bool error = false;
+int temp = 0;
 void leftButtonPress() {
   for (int i = 0, j = 8; i < 8 && j > 0; i++, j--) {
     for (int count = 0; count < 8; count++) {
-      if ((currentMessage[count] & 0x7F) == 0) {
+     if ((currentMessage[count] & 0x7F) == 0) {
           error = true;
       }
+    }
+
+    for (int x = 0; x < 8; x++) {
+      Serial.println(currentMessage[x]);
+      temp += currentMessage[x];
+    }
+
+    if (temp == 1014) {
+      currentMessage[0] = 0;
+      currentMessage[1] = 0;
+      currentMessage[3] = 0;
+      currentMessage[4] = 0;
+      currentMessage[6] = 0;
+      currentMessage[7] = 0;
+
+      for (int x = 0; x < 8; x++) {
+        if (currentMessage[x] == storedCombo[x]) {
+          equal = true;
+        }
+      }
+      i = 7;
     }
 
     if (error == true){
@@ -271,7 +297,7 @@ void leftButtonPress() {
       }
       equal = false;
       i = 7;
-    } else if ((currentMessage[j-1] & 0x7F) == combo[i]) {
+    } else if ((currentMessage[j-1] & 0x7F) == storedCombo[i]) {
       equal = true;
     } else {
       equal = false;
@@ -389,6 +415,7 @@ void confirmingMode() {
       for (int count = 0; count < 8; count++) {
         combo[count] = (currentMessage[count] & 0x7F);
       }
+      EEPROM.put(4, combo);
     }
     mode = 2;
   }
